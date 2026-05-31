@@ -19,15 +19,19 @@ def run(dry_run: bool = False, n: int = 1) -> int:
     cfg = Config.load()
     topics = pick_topics(cfg.state_file, n=n)
     if not topics:
-        print("[warn] 선정된 주제 없음. 종료.", file=sys.stderr)
+        print("[fatal] 선정된 주제 없음. 종료.", file=sys.stderr)
         return 1
 
+    saved = 0
+    failures: list[str] = []
     for topic in topics:
         print(f"[info] 주제: {topic}")
         try:
             post = generate_post(cfg.anthropic_api_key, cfg.anthropic_model, topic)
-        except Exception as exc:  # noqa: BLE001 - 외부 호출 광범위 캐치
-            print(f"[error] 생성 실패: {exc}", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001
+            msg = f"{type(exc).__name__}: {exc}"
+            print(f"[error] 생성 실패: {msg}", file=sys.stderr)
+            failures.append(f"{topic} → {msg}")
             continue
 
         body = inject_into_markdown(
@@ -42,10 +46,22 @@ def run(dry_run: bool = False, n: int = 1) -> int:
             print(f"keywords: {post.keywords}")
             print("--- body preview (300자) ---")
             print(body[:300])
+            saved += 1
             continue
 
         out = save_post(post, body, cfg.posts_dir, cfg.blog_author)
         print(f"[ok] 저장: {out.relative_to(cfg.posts_dir.parents[2])}")
+        saved += 1
+
+    if saved == 0:
+        print(
+            f"[fatal] {len(topics)}개 주제 모두 생성 실패. "
+            f"실패 내역:\n  - " + "\n  - ".join(failures),
+            file=sys.stderr,
+        )
+        return 2
+    if failures:
+        print(f"[warn] 일부 실패 ({len(failures)}개)", file=sys.stderr)
     return 0
 
 
