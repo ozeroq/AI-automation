@@ -30,6 +30,8 @@ jobs:
           working-directory: content-bot/blog
 
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Build with Jekyll
         working-directory: content-bot/blog
