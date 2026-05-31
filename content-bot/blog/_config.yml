@@ -1,0 +1,26 @@
+title: AI 자동 블로그
+description: Claude API 로 매일 자동 발행되는 한국어 정보 블로그
+author: 익명
+timezone: Asia/Seoul
+permalink: /:year/:month/:day/:title/
+markdown: kramdown
+highlighter: rouge
+theme: minima
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# GitHub Actions 의 GH Pages 빌드는 안전 모드 → minima 같은 공식 테마만 동작
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+      comments: false
+
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
