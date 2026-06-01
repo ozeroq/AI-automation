@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       metadata: { email: body.email },
     },
     metadata: { email: body.email, plan: "pro" },
-    success_url: `${origin}/manage?email=${encodeURIComponent(body.email)}&subscribed=1`,
+    success_url: `${origin}/auth/checkout-success?session_id={CHECKOUT_SESSION_ID}&next=${encodeURIComponent("/manage?subscribed=1")}`,
     cancel_url: `${origin}/pricing`,
   });
 

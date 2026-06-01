@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       room_description: body.room_description ?? "",
       panorama_url: body.panorama_url ?? "",
     },
-    success_url: `${origin}/manage?email=${encodeURIComponent(body.owner_email)}&purchase=success`,
+    success_url: `${origin}/auth/checkout-success?session_id={CHECKOUT_SESSION_ID}&next=${encodeURIComponent("/manage?purchase=success")}`,
     cancel_url: `${origin}/buy?bx=${area.bx}&by=${area.by}&bw=${area.bw}&bh=${area.bh}`,
   });
 
