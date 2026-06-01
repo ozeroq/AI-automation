@@ -18,6 +18,11 @@ export interface Block {
 
   // 클릭 시 동작
   external_url?: string; // basic 티어
+
+  // 360° 등각투영 파노라마 이미지 URL (exhibition/premium 티어)
+  // 있으면 클릭 시 포털 전환 → Pannellum 뷰어
+  panorama_url?: string;
+
   room?: {
     title: string;
     owner_name: string;
@@ -39,4 +44,5 @@ export interface BlockSummary {
   thumbnail_url: string;
   owner_name?: string;
   has_room: boolean;
+  has_panorama: boolean;
 }

@@ -18,6 +18,7 @@ const Body = z.object({
   thumbnail_url: z.string().url(),
   room_title: z.string().max(80).optional(),
   room_description: z.string().max(2000).optional(),
+  panorama_url: z.string().url().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
       thumbnail_url: body.thumbnail_url,
       room_title: body.room_title ?? "",
       room_description: body.room_description ?? "",
+      panorama_url: body.panorama_url ?? "",
     },
     success_url: `${origin}/?purchase=success`,
     cancel_url: `${origin}/buy?bx=${area.bx}&by=${area.by}&bw=${area.bw}&bh=${area.bh}`,

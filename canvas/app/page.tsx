@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Canvas from "@/components/Canvas";
 import RoomModal from "@/components/RoomModal";
+import PortalTransition, { type ScreenRect } from "@/components/PortalTransition";
 import type { BlockArea } from "@/lib/grid";
-import type { BlockSummary } from "@/lib/types";
+import type { Block, BlockSummary } from "@/lib/types";
 import { TIER_PRICES_KRW, formatKrw } from "@/lib/pricing";
+
+type ActivePortal = {
+  rect: ScreenRect;
+  block: Block;
+};
 
 export default function Home() {
   const [blocks, setBlocks] = useState<BlockSummary[]>([]);
   const [openBlockId, setOpenBlockId] = useState<string | null>(null);
+  const [portal, setPortal] = useState<ActivePortal | null>(null);
   const [pendingArea, setPendingArea] = useState<BlockArea | null>(null);
 
   useEffect(() => {
@@ -48,10 +55,33 @@ export default function Home() {
       <Canvas
         blocks={blocks}
         onSelectArea={(a) => setPendingArea(a)}
-        onClickBlock={(b) => setOpenBlockId(b.id)}
+        onClickBlock={async (b, rect) => {
+          if (b.has_panorama) {
+            // 풀 블록 정보를 받아와서 포털 전환
+            const res = await fetch(`/api/blocks/${b.id}`);
+            const data = (await res.json()) as { block: Block | null };
+            if (data.block?.panorama_url) {
+              setPortal({ rect, block: data.block });
+              return;
+            }
+          }
+          setOpenBlockId(b.id);
+        }}
       />
 
       <RoomModal blockId={openBlockId} onClose={() => setOpenBlockId(null)} />
+
+      {portal && portal.block.panorama_url && (
+        <PortalTransition
+          rect={portal.rect}
+          panoramaUrl={portal.block.panorama_url}
+          thumbnailUrl={portal.block.thumbnail_url}
+          title={portal.block.room?.title}
+          ownerName={portal.block.room?.owner_name}
+          description={portal.block.room?.description}
+          onClose={() => setPortal(null)}
+        />
+      )}
 
       {pendingArea && (
         <PurchaseSheet area={pendingArea} onClose={() => setPendingArea(null)} />
@@ -61,8 +91,9 @@ export default function Home() {
         <Info title="① 빈 영역 드래그">
           캔버스에서 사고 싶은 영역을 마우스로 드래그. 10×10 블록 단위로 자동 스냅.
         </Info>
-        <Info title="② 룸 콘텐츠 업로드">
-          썸네일 이미지 + (선택) 갤러리 사진·영상·소개글. 외부 링크만 걸어도 OK.
+        <Info title="② 360° 룸 업로드">
+          Exhibition 티어 이상은 4K 등각투영 파노라마 1장을 업로드하면, 본인 블록 클릭 시
+          화면이 풀스크린으로 확장되며 가상 룸이 열립니다.
         </Info>
         <Info title="③ 결제하면 영구 소유">
           기본 ₩1,000/블록부터. 한 번 구매하면 본인 룸은 영원히 그 자리에 남습니다.

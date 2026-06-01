@@ -26,6 +26,7 @@ function summarize(b: Block): BlockSummary {
     thumbnail_url: b.thumbnail_url,
     owner_name: b.room?.owner_name,
     has_room: !!b.room,
+    has_panorama: !!b.panorama_url,
   };
 }
 
@@ -75,14 +76,17 @@ export async function seedIfEmpty(): Promise<void> {
       bw: 10,
       bh: 10,
       tier: "exhibition",
-      thumbnail_url: "/seed/welcome.svg",
+      thumbnail_url:
+        "https://pannellum.org/images/alma.jpg",
+      // Pannellum 공식 데모용 등각투영 파노라마 (CC BY-SA)
+      panorama_url: "https://pannellum.org/images/alma.jpg",
       created_at: Date.now(),
       status: "active",
       room: {
-        title: "PixelRoom에 오신 걸 환영합니다",
+        title: "PixelRoom 데모 룸",
         owner_name: "운영팀",
         description:
-          "이 캔버스의 100만 픽셀이 곧 10,000명의 전시 룸이 됩니다. 빈 영역을 드래그해 본인의 룸을 만들어보세요.",
+          "이 블록을 클릭하면 박스가 풀스크린으로 확장되며 360° 룸이 열립니다. 빈 영역을 드래그해 본인의 룸을 만들어보세요.",
         media: [],
       },
     },

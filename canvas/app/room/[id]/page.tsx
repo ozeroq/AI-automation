@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getBlock } from "@/lib/db";
+import RoomPanoramaView from "./RoomPanoramaView";
 
 export async function generateMetadata({
   params,
@@ -30,6 +31,17 @@ export default async function RoomPage({
   const { id } = await params;
   const block = await getBlock(id);
   if (!block) notFound();
+
+  if (block.panorama_url) {
+    return (
+      <RoomPanoramaView
+        panoramaUrl={block.panorama_url}
+        title={block.room?.title ?? ""}
+        ownerName={block.room?.owner_name ?? ""}
+        description={block.room?.description ?? ""}
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen p-6 max-w-2xl mx-auto">

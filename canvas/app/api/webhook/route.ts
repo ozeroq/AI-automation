@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     tier: (m.tier as Tier) || "basic",
     thumbnail_url: m.thumbnail_url ?? "",
     external_url: m.external_url || undefined,
+    panorama_url: m.panorama_url || undefined,
     created_at: Date.now(),
     status: "active",
     room: m.room_title

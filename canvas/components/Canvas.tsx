@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CANVAS_PX, BLOCK_PX, GRID_SIZE, rectFromDrag, type BlockArea } from "@/lib/grid";
 import type { BlockSummary } from "@/lib/types";
+import type { ScreenRect } from "./PortalTransition";
 
 type Props = {
   blocks: BlockSummary[];
   onSelectArea: (a: BlockArea) => void;
-  onClickBlock: (b: BlockSummary) => void;
+  onClickBlock: (b: BlockSummary, rect: ScreenRect) => void;
 };
 
 export default function Canvas({ blocks, onSelectArea, onClickBlock }: Props) {
@@ -76,6 +77,17 @@ export default function Canvas({ blocks, onSelectArea, onClickBlock }: Props) {
     return { x, y };
   }
 
+  function blockToScreenRect(b: BlockSummary) {
+    const wrap = wrapRef.current!;
+    const rect = wrap.getBoundingClientRect();
+    return {
+      x: rect.left + pan.x + b.bx * BLOCK_PX * zoom,
+      y: rect.top + pan.y + b.by * BLOCK_PX * zoom,
+      w: b.bw * BLOCK_PX * zoom,
+      h: b.bh * BLOCK_PX * zoom,
+    };
+  }
+
   function handleMouseDown(e: React.MouseEvent) {
     const isPan = e.button === 1 || e.shiftKey;
     if (isPan) {
@@ -120,8 +132,12 @@ export default function Canvas({ blocks, onSelectArea, onClickBlock }: Props) {
         const bx = Math.floor(p.x / BLOCK_PX);
         const by = Math.floor(p.y / BLOCK_PX);
         const hit = occupancy.get(by * GRID_SIZE + bx);
-        if (hit) onClickBlock(hit);
-        else onSelectArea({ bx, by, bw: 1, bh: 1 });
+        if (hit) {
+          const rect = blockToScreenRect(hit);
+          onClickBlock(hit, rect);
+        } else {
+          onSelectArea({ bx, by, bw: 1, bh: 1 });
+        }
       }
     }
     setDrag(null);

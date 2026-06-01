@@ -14,9 +14,12 @@ export default function BuyClient({ area }: { area: BlockArea }) {
   const [externalUrl, setExternalUrl] = useState("");
   const [roomTitle, setRoomTitle] = useState("");
   const [roomDesc, setRoomDesc] = useState("");
+  const [panoramaUrl, setPanoramaUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [available, setAvailable] = useState<boolean | null>(null);
+
+  const supportsPanorama = tier === "exhibition" || tier === "premium";
 
   const blocks = area.bw * area.bh;
   const price = useMemo(() => priceKrw(area, tier), [area, tier]);
@@ -48,6 +51,7 @@ export default function BuyClient({ area }: { area: BlockArea }) {
           external_url: externalUrl || undefined,
           room_title: roomTitle || undefined,
           room_description: roomDesc || undefined,
+          panorama_url: supportsPanorama && panoramaUrl ? panoramaUrl : undefined,
         }),
       });
       const data = await r.json();
@@ -163,6 +167,20 @@ export default function BuyClient({ area }: { area: BlockArea }) {
                 placeholder="작가/브랜드 소개, 작품 설명 등"
               />
             </Field>
+            {supportsPanorama && (
+              <Field label="360° 파노라마 이미지 URL (선택)">
+                <input
+                  value={panoramaUrl}
+                  onChange={(e) => setPanoramaUrl(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-700 bg-transparent"
+                  placeholder="https://... (4K 등각투영 .jpg 권장)"
+                />
+                <p className="text-xs opacity-60 mt-1">
+                  입력하면 캔버스에서 본인 블록을 클릭했을 때 박스가 풀스크린으로
+                  확장되며 360° 룸이 열립니다. (Pannellum 뷰어)
+                </p>
+              </Field>
+            )}
             <p className="text-xs opacity-60">
               ※ 결제 완료 후 룸 콘텐츠(추가 이미지·영상·임베드)는 관리자 패널에서
               편집할 수 있습니다.
