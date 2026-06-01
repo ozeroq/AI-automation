@@ -50,14 +50,22 @@ export default function Home() {
             1000×1000 캔버스 · 100만 픽셀 · 10,000개의 전시 룸
           </p>
         </div>
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-2 text-sm items-center">
+          <Link
+            href="/pricing"
+            className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800"
+          >
+            가격
+          </Link>
+          <Link
+            href="/manage"
+            className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800"
+          >
+            내 룸
+          </Link>
           <div className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
             <div className="opacity-60 text-xs">남은 블록</div>
             <div className="font-mono text-lg">{remaining.toLocaleString()}</div>
-          </div>
-          <div className="px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
-            <div className="opacity-60 text-xs">최저가 / 블록</div>
-            <div className="font-mono text-lg">{formatKrw(TIER_PRICES_KRW.basic)}</div>
           </div>
         </div>
       </header>

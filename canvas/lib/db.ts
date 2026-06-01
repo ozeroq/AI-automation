@@ -5,6 +5,7 @@
 import { Redis } from "@upstash/redis";
 import type { Block, BlockSummary } from "./types";
 import { areasOverlap, type BlockArea } from "./grid";
+import { getActiveProEmails } from "./subscriptions";
 
 const HAS_REDIS =
   !!process.env.UPSTASH_REDIS_REST_URL &&
@@ -16,7 +17,8 @@ const keyBlock = (id: string) => `pc:block:${id}`;
 
 const memory = new Map<string, Block>();
 
-function summarize(b: Block): BlockSummary {
+function summarize(b: Block, proEmails: Set<string>): BlockSummary {
+  const email = b.owner_email?.toLowerCase();
   return {
     id: b.id,
     bx: b.bx,
@@ -27,10 +29,12 @@ function summarize(b: Block): BlockSummary {
     owner_name: b.room?.owner_name,
     has_room: !!b.room,
     has_panorama: !!b.panorama_url,
+    is_pro: !!email && proEmails.has(email),
   };
 }
 
 export async function listActiveBlocks(): Promise<BlockSummary[]> {
+  const proEmails = await getActiveProEmails();
   if (redis) {
     const ids = (await redis.smembers(KEY_INDEX)) as string[];
     if (ids.length === 0) return [];
@@ -39,9 +43,31 @@ export async function listActiveBlocks(): Promise<BlockSummary[]> {
     );
     return blocks
       .filter((b): b is Block => !!b && b.status === "active")
-      .map(summarize);
+      .map((b) => summarize(b, proEmails));
   }
-  return [...memory.values()].filter((b) => b.status === "active").map(summarize);
+  return [...memory.values()]
+    .filter((b) => b.status === "active")
+    .map((b) => summarize(b, proEmails));
+}
+
+/** 특정 이메일이 소유한 모든 블록 (관리 페이지용) */
+export async function listBlocksByEmail(email: string): Promise<Block[]> {
+  if (!email) return [];
+  const e = email.toLowerCase();
+  if (redis) {
+    const ids = (await redis.smembers(KEY_INDEX)) as string[];
+    if (ids.length === 0) return [];
+    const blocks = await Promise.all(
+      ids.map((id) => redis.get<Block>(keyBlock(id))),
+    );
+    return blocks.filter(
+      (b): b is Block =>
+        !!b && b.status === "active" && b.owner_email?.toLowerCase() === e,
+    );
+  }
+  return [...memory.values()].filter(
+    (b) => b.status === "active" && b.owner_email?.toLowerCase() === e,
+  );
 }
 
 export async function getBlock(id: string): Promise<Block | null> {

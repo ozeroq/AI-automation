@@ -331,7 +331,14 @@ export default function Canvas({ blocks, onSelectArea, onClickBlock }: Props) {
 
       {hover && (
         <div className="absolute bottom-3 right-3 z-10 max-w-xs p-3 rounded-lg bg-zinc-900/95 border border-zinc-700 text-sm shadow-xl pointer-events-none">
-          <div className="font-semibold">{hover.owner_name ?? "익명"}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{hover.owner_name ?? "익명"}</span>
+            {hover.is_pro && (
+              <span className="px-1.5 py-0.5 rounded bg-pink-500 text-[10px] font-semibold">
+                Pro
+              </span>
+            )}
+          </div>
           <div className="text-xs opacity-70 mt-1">
             ({hover.bx},{hover.by}) · {hover.bw}×{hover.bh} 블록
           </div>

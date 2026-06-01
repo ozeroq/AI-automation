@@ -14,6 +14,7 @@ const Body = z.object({
   bh: z.number().int().min(1).max(100),
   tier: z.enum(["basic", "gallery", "exhibition", "premium"] as const),
   owner_name: z.string().min(1).max(40),
+  owner_email: z.string().email(),
   external_url: z.string().url().optional(),
   thumbnail_url: z.string().url(),
   room_title: z.string().max(80).optional(),
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    customer_email: body.owner_email,
     line_items: [
       {
         price_data: {
@@ -61,19 +63,21 @@ export async function POST(req: NextRequest) {
       },
     ],
     metadata: {
+      kind: "block_purchase",
       bx: String(area.bx),
       by: String(area.by),
       bw: String(area.bw),
       bh: String(area.bh),
       tier: body.tier,
       owner_name: body.owner_name,
+      owner_email: body.owner_email,
       external_url: body.external_url ?? "",
       thumbnail_url: body.thumbnail_url,
       room_title: body.room_title ?? "",
       room_description: body.room_description ?? "",
       panorama_url: body.panorama_url ?? "",
     },
-    success_url: `${origin}/?purchase=success`,
+    success_url: `${origin}/manage?email=${encodeURIComponent(body.owner_email)}&purchase=success`,
     cancel_url: `${origin}/buy?bx=${area.bx}&by=${area.by}&bw=${area.bw}&bh=${area.bh}`,
   });
 

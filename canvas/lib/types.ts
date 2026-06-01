@@ -16,6 +16,9 @@ export interface Block {
   // 캔버스에 표시될 썸네일 (필수)
   thumbnail_url: string;
 
+  // 소유자 이메일 (Pro 구독 매칭 + 룸 관리 인증용)
+  owner_email?: string;
+
   // 클릭 시 동작
   external_url?: string; // basic 티어
 
@@ -45,4 +48,24 @@ export interface BlockSummary {
   owner_name?: string;
   has_room: boolean;
   has_panorama: boolean;
+  is_pro: boolean;
+}
+
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+  | "unpaid";
+
+export interface Subscriber {
+  email: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  status: SubscriptionStatus;
+  current_period_end: number; // unix ms
+  created_at: number;
+  plan: "pro";
 }

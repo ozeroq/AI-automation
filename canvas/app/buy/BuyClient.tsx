@@ -10,6 +10,7 @@ const TIERS: Tier[] = ["basic", "gallery", "exhibition", "premium"];
 export default function BuyClient({ area }: { area: BlockArea }) {
   const [tier, setTier] = useState<Tier>("basic");
   const [ownerName, setOwnerName] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
   const [roomTitle, setRoomTitle] = useState("");
@@ -47,6 +48,7 @@ export default function BuyClient({ area }: { area: BlockArea }) {
           ...area,
           tier,
           owner_name: ownerName,
+          owner_email: ownerEmail,
           thumbnail_url: thumbnailUrl,
           external_url: externalUrl || undefined,
           room_title: roomTitle || undefined,
@@ -122,6 +124,17 @@ export default function BuyClient({ area }: { area: BlockArea }) {
             required
             className="w-full px-3 py-2 rounded-lg border border-zinc-700 bg-transparent"
             placeholder="예) 김아무개 스튜디오"
+          />
+        </Field>
+
+        <Field label="이메일 (구매 확인 + 룸 관리·Pro 매칭용)" required>
+          <input
+            type="email"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            required
+            className="w-full px-3 py-2 rounded-lg border border-zinc-700 bg-transparent"
+            placeholder="you@example.com"
           />
         </Field>
 
