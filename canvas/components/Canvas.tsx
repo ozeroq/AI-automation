@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CANVAS_PX, BLOCK_PX, GRID_SIZE, rectFromDrag, type BlockArea } from "@/lib/grid";
+import { useEffect, useRef, useState } from "react";
+import OpenSeadragon from "openseadragon";
+import {
+  CANVAS_PX,
+  BLOCK_PX,
+  GRID_SIZE,
+  type BlockArea,
+} from "@/lib/grid";
 import type { BlockSummary } from "@/lib/types";
 import type { ScreenRect } from "./PortalTransition";
 
@@ -11,186 +17,331 @@ type Props = {
   onClickBlock: (b: BlockSummary, rect: ScreenRect) => void;
 };
 
+type Mode = "select" | "pan";
+
+// 그리드 라인이 그려진 256×256 배경 타일 (어두운 색 + 100px 간격 보조선)
+const TILE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" fill="#0c0c0c"/>
+  ${Array.from({ length: 27 })
+    .map(
+      (_, i) =>
+        `<line x1="${i * 10}" y1="0" x2="${i * 10}" y2="256" stroke="#171717" stroke-width="0.5"/>`,
+    )
+    .join("")}
+  ${Array.from({ length: 27 })
+    .map(
+      (_, i) =>
+        `<line x1="0" y1="${i * 10}" x2="256" y2="${i * 10}" stroke="#171717" stroke-width="0.5"/>`,
+    )
+    .join("")}
+</svg>`;
+
+function makeTileUrl(): string {
+  if (typeof window === "undefined") return "";
+  return `data:image/svg+xml;base64,${btoa(TILE_SVG)}`;
+}
+
+function rectFromImagePoints(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): BlockArea {
+  const sx = Math.max(0, Math.floor(Math.min(ax, bx) / BLOCK_PX));
+  const sy = Math.max(0, Math.floor(Math.min(ay, by) / BLOCK_PX));
+  const ex = Math.min(GRID_SIZE, Math.ceil(Math.max(ax, bx) / BLOCK_PX));
+  const ey = Math.min(GRID_SIZE, Math.ceil(Math.max(ay, by) / BLOCK_PX));
+  return {
+    bx: sx,
+    by: sy,
+    bw: Math.max(1, ex - sx),
+    bh: Math.max(1, ey - sy),
+  };
+}
+
 export default function Canvas({ blocks, onSelectArea, onClickBlock }: Props) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [zoom, setZoom] = useState(0.6);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [drag, setDrag] = useState<
-    | { mode: "select"; startCanvas: { x: number; y: number }; endCanvas: { x: number; y: number } }
-    | { mode: "pan"; lastClient: { x: number; y: number } }
-    | null
-  >(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
+  const overlayMapRef = useRef(new Map<string, HTMLElement>());
+  const selectionDivRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+
+  const [mode, setMode] = useState<Mode>("select");
+  const modeRef = useRef<Mode>(mode);
+  modeRef.current = mode;
+
+  const [zoomPct, setZoomPct] = useState(60);
   const [hover, setHover] = useState<BlockSummary | null>(null);
 
-  const occupancy = useMemo(() => {
-    const map = new Map<number, BlockSummary>();
-    for (const b of blocks) {
-      for (let dy = 0; dy < b.bh; dy++) {
-        for (let dx = 0; dx < b.bw; dx++) {
-          map.set((b.by + dy) * GRID_SIZE + (b.bx + dx), b);
-        }
-      }
-    }
-    return map;
-  }, [blocks]);
-
+  // OpenSeadragon 뷰어 초기화 (단 1회)
   useEffect(() => {
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-    cvs.width = CANVAS_PX;
-    cvs.height = CANVAS_PX;
-    const ctx = cvs.getContext("2d");
-    if (!ctx) return;
-    ctx.imageSmoothingEnabled = false;
+    if (!containerRef.current) return;
 
-    ctx.fillStyle = "#0f0f0f";
-    ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
+    const tileUrl = makeTileUrl();
 
-    for (const b of blocks) {
-      const x = b.bx * BLOCK_PX;
-      const y = b.by * BLOCK_PX;
-      const w = b.bw * BLOCK_PX;
-      const h = b.bh * BLOCK_PX;
-      const hue = (b.bx * 7 + b.by * 13) % 360;
-      ctx.fillStyle = `hsl(${hue} 70% 45%)`;
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "rgba(0,0,0,0.5)";
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    const viewer = OpenSeadragon({
+      element: containerRef.current,
+      prefixUrl:
+        "https://cdn.jsdelivr.net/npm/openseadragon@5.0.1/build/openseadragon/images/",
+      showNavigationControl: false,
+      showNavigator: false,
+      visibilityRatio: 0.6,
+      constrainDuringPan: true,
+      defaultZoomLevel: 0.6,
+      minZoomImageRatio: 0.4,
+      maxZoomPixelRatio: 25,
+      animationTime: 0.4,
+      springStiffness: 7,
+      gestureSettingsMouse: {
+        scrollToZoom: true,
+        clickToZoom: false,
+        dblClickToZoom: false,
+        dragToPan: false,
+        flickEnabled: false,
+        pinchToZoom: true,
+      },
+      gestureSettingsTouch: {
+        scrollToZoom: false,
+        clickToZoom: false,
+        dblClickToZoom: false,
+        dragToPan: true,
+        flickEnabled: true,
+        pinchToZoom: true,
+      },
+      tileSources: {
+        width: CANVAS_PX,
+        height: CANVAS_PX,
+        tileSize: 256,
+        tileOverlap: 0,
+        maxLevel: 8,
+        getTileUrl: () => tileUrl,
+      },
+    });
+    viewerRef.current = viewer;
+
+    // 선택 박스 DOM (드래그 중 표시되는 분홍색 사각형)
+    const selDiv = document.createElement("div");
+    selDiv.style.cssText =
+      "position:absolute; pointer-events:none; border:2px dashed #ff3b81; background:rgba(255,59,129,0.15); display:none; box-sizing:border-box;";
+    selectionDivRef.current = selDiv;
+    containerRef.current.appendChild(selDiv);
+
+    function imgPointFromEvent(position: OpenSeadragon.Point) {
+      const vp = viewer.viewport.pointFromPixel(position);
+      const img = viewer.viewport.viewportToImageCoordinates(vp);
+      return { x: img.x, y: img.y };
     }
 
-    if (drag?.mode === "select") {
-      const a = rectFromDrag(drag.startCanvas, drag.endCanvas);
-      ctx.strokeStyle = "#ff3b81";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 2]);
-      ctx.strokeRect(a.bx * BLOCK_PX, a.by * BLOCK_PX, a.bw * BLOCK_PX, a.bh * BLOCK_PX);
-      ctx.setLineDash([]);
-    }
-  }, [blocks, drag]);
-
-  function clientToCanvas(clientX: number, clientY: number) {
-    const wrap = wrapRef.current!;
-    const rect = wrap.getBoundingClientRect();
-    const x = (clientX - rect.left - pan.x) / zoom;
-    const y = (clientY - rect.top - pan.y) / zoom;
-    return { x, y };
-  }
-
-  function blockToScreenRect(b: BlockSummary) {
-    const wrap = wrapRef.current!;
-    const rect = wrap.getBoundingClientRect();
-    return {
-      x: rect.left + pan.x + b.bx * BLOCK_PX * zoom,
-      y: rect.top + pan.y + b.by * BLOCK_PX * zoom,
-      w: b.bw * BLOCK_PX * zoom,
-      h: b.bh * BLOCK_PX * zoom,
-    };
-  }
-
-  function handleMouseDown(e: React.MouseEvent) {
-    const isPan = e.button === 1 || e.shiftKey;
-    if (isPan) {
-      setDrag({ mode: "pan", lastClient: { x: e.clientX, y: e.clientY } });
-      return;
-    }
-    const p = clientToCanvas(e.clientX, e.clientY);
-    setDrag({ mode: "select", startCanvas: p, endCanvas: p });
-  }
-
-  function handleMouseMove(e: React.MouseEvent) {
-    if (drag?.mode === "pan") {
-      setPan((prev) => ({
-        x: prev.x + (e.clientX - drag.lastClient.x),
-        y: prev.y + (e.clientY - drag.lastClient.y),
-      }));
-      setDrag({ mode: "pan", lastClient: { x: e.clientX, y: e.clientY } });
-      return;
-    }
-    const p = clientToCanvas(e.clientX, e.clientY);
-    if (drag?.mode === "select") {
-      setDrag({ ...drag, endCanvas: p });
-      return;
-    }
-    const bx = Math.floor(p.x / BLOCK_PX);
-    const by = Math.floor(p.y / BLOCK_PX);
-    const hit = occupancy.get(by * GRID_SIZE + bx) ?? null;
-    if (hit?.id !== hover?.id) setHover(hit);
-  }
-
-  function handleMouseUp(e: React.MouseEvent) {
-    if (drag?.mode === "select") {
-      const dx = Math.abs(drag.endCanvas.x - drag.startCanvas.x);
-      const dy = Math.abs(drag.endCanvas.y - drag.startCanvas.y);
-      const moved = dx > 4 || dy > 4;
-      if (moved) {
-        const area = rectFromDrag(drag.startCanvas, drag.endCanvas);
-        onSelectArea(area);
-      } else {
-        // 단순 클릭: 해당 좌표의 블록 있으면 룸 열기, 없으면 1블록 선택
-        const p = clientToCanvas(e.clientX, e.clientY);
-        const bx = Math.floor(p.x / BLOCK_PX);
-        const by = Math.floor(p.y / BLOCK_PX);
-        const hit = occupancy.get(by * GRID_SIZE + bx);
-        if (hit) {
-          const rect = blockToScreenRect(hit);
-          onClickBlock(hit, rect);
-        } else {
-          onSelectArea({ bx, by, bw: 1, bh: 1 });
-        }
+    function updateSelectionDiv() {
+      const d = dragRef.current;
+      const container = containerRef.current;
+      if (!d || !container) {
+        selDiv.style.display = "none";
+        return;
       }
+      const x0 = Math.floor(Math.min(d.startX, d.curX) / BLOCK_PX) * BLOCK_PX;
+      const y0 = Math.floor(Math.min(d.startY, d.curY) / BLOCK_PX) * BLOCK_PX;
+      const x1 = Math.ceil(Math.max(d.startX, d.curX) / BLOCK_PX) * BLOCK_PX;
+      const y1 = Math.ceil(Math.max(d.startY, d.curY) / BLOCK_PX) * BLOCK_PX;
+      const tl = viewer.viewport.imageToViewerElementCoordinates(
+        new OpenSeadragon.Point(x0, y0),
+      );
+      const br = viewer.viewport.imageToViewerElementCoordinates(
+        new OpenSeadragon.Point(x1, y1),
+      );
+      selDiv.style.display = "block";
+      selDiv.style.left = `${tl.x}px`;
+      selDiv.style.top = `${tl.y}px`;
+      selDiv.style.width = `${Math.max(0, br.x - tl.x)}px`;
+      selDiv.style.height = `${Math.max(0, br.y - tl.y)}px`;
     }
-    setDrag(null);
-  }
 
-  function handleWheel(e: React.WheelEvent) {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    setZoom((z) => Math.max(0.2, Math.min(4, z * factor)));
-  }
+    viewer.addHandler("canvas-press", (event) => {
+      if (modeRef.current !== "select") return;
+      const p = imgPointFromEvent(event.position);
+      dragRef.current = { startX: p.x, startY: p.y, curX: p.x, curY: p.y };
+    });
+
+    viewer.addHandler("canvas-drag", (event) => {
+      if (modeRef.current === "pan") {
+        const delta = viewer.viewport.deltaPointsFromPixels(event.delta.negate());
+        viewer.viewport.panBy(delta);
+        return;
+      }
+      if (!dragRef.current) return;
+      const p = imgPointFromEvent(event.position);
+      dragRef.current.curX = p.x;
+      dragRef.current.curY = p.y;
+      updateSelectionDiv();
+    });
+
+    viewer.addHandler("canvas-release", () => {
+      if (modeRef.current !== "select" || !dragRef.current) return;
+      const { startX, startY, curX, curY } = dragRef.current;
+      const dx = Math.abs(curX - startX);
+      const dy = Math.abs(curY - startY);
+      dragRef.current = null;
+      selDiv.style.display = "none";
+      if (dx < BLOCK_PX / 2 && dy < BLOCK_PX / 2) return; // 클릭은 canvas-click 에서
+      const area = rectFromImagePoints(startX, startY, curX, curY);
+      onSelectArea(area);
+    });
+
+    viewer.addHandler("canvas-click", (event) => {
+      if (!event.quick) return;
+      const p = imgPointFromEvent(event.position);
+      const bxi = Math.floor(p.x / BLOCK_PX);
+      const byi = Math.floor(p.y / BLOCK_PX);
+      const hit = blocksRef.current.find(
+        (b) =>
+          bxi >= b.bx && bxi < b.bx + b.bw && byi >= b.by && byi < b.by + b.bh,
+      );
+      if (hit) {
+        const tlImg = new OpenSeadragon.Point(hit.bx * BLOCK_PX, hit.by * BLOCK_PX);
+        const brImg = new OpenSeadragon.Point(
+          (hit.bx + hit.bw) * BLOCK_PX,
+          (hit.by + hit.bh) * BLOCK_PX,
+        );
+        const tlWin = viewer.viewport.imageToWindowCoordinates(tlImg);
+        const brWin = viewer.viewport.imageToWindowCoordinates(brImg);
+        onClickBlock(hit, {
+          x: tlWin.x,
+          y: tlWin.y,
+          w: brWin.x - tlWin.x,
+          h: brWin.y - tlWin.y,
+        });
+        return;
+      }
+      if (modeRef.current === "select") {
+        onSelectArea({ bx: bxi, by: byi, bw: 1, bh: 1 });
+      }
+    });
+
+    viewer.addHandler("animation", updateSelectionDiv);
+    viewer.addHandler("update-viewport", updateSelectionDiv);
+    viewer.addHandler("zoom", () => {
+      setZoomPct(Math.round(viewer.viewport.getZoom(true) * 100));
+    });
+    viewer.addHandler("open", () => {
+      setZoomPct(Math.round(viewer.viewport.getZoom(true) * 100));
+    });
+
+    return () => {
+      viewer.destroy();
+      viewerRef.current = null;
+      overlayMapRef.current.clear();
+    };
+  }, [onClickBlock, onSelectArea]);
+
+  // 블록 변경 시 오버레이 재구성
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const sync = (v: OpenSeadragon.Viewer) => {
+      const map = overlayMapRef.current;
+      for (const el of map.values()) {
+        try {
+          v.removeOverlay(el);
+        } catch {}
+      }
+      map.clear();
+      for (const b of blocks) {
+        const div = document.createElement("div");
+        div.style.cssText = `
+          background: #1a1a1a center/cover no-repeat;
+          ${b.thumbnail_url ? `background-image: url(${JSON.stringify(b.thumbnail_url)});` : ""}
+          cursor: pointer;
+          border-radius: 1px;
+          box-shadow: 0 0 0 1px rgba(0,0,0,0.4) inset;
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        `;
+        div.title = b.owner_name ?? "";
+        div.addEventListener("mouseenter", () => {
+          setHover(b);
+          div.style.boxShadow = "0 0 0 2px #ff3b81, 0 0 16px rgba(255,59,129,0.4)";
+        });
+        div.addEventListener("mouseleave", () => {
+          setHover((cur) => (cur?.id === b.id ? null : cur));
+          div.style.boxShadow = "0 0 0 1px rgba(0,0,0,0.4) inset";
+        });
+        v.addOverlay({
+          element: div,
+          location: new OpenSeadragon.Rect(
+            (b.bx * BLOCK_PX) / CANVAS_PX,
+            (b.by * BLOCK_PX) / CANVAS_PX,
+            (b.bw * BLOCK_PX) / CANVAS_PX,
+            (b.bh * BLOCK_PX) / CANVAS_PX,
+          ),
+        });
+        map.set(b.id, div);
+      }
+    };
+
+    if (viewer.world.getItemCount() === 0) {
+      const v = viewer;
+      const onOpen = () => {
+        v.removeHandler("open", onOpen);
+        sync(v);
+      };
+      v.addHandler("open", onOpen);
+      return () => v.removeHandler("open", onOpen);
+    }
+    sync(viewer);
+  }, [blocks]);
 
   return (
     <div className="relative w-full h-[80vh] overflow-hidden rounded-xl border border-zinc-800">
       <div className="absolute top-3 left-3 z-10 flex gap-2 text-xs">
-        <span className="px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700">
-          줌 {Math.round(zoom * 100)}%
+        <button
+          onClick={() => setMode("select")}
+          className={`px-3 py-1.5 rounded font-medium ${
+            mode === "select"
+              ? "bg-pink-500 text-white"
+              : "bg-zinc-900/90 border border-zinc-700 hover:bg-zinc-800"
+          }`}
+        >
+          영역 선택
+        </button>
+        <button
+          onClick={() => setMode("pan")}
+          className={`px-3 py-1.5 rounded font-medium ${
+            mode === "pan"
+              ? "bg-pink-500 text-white"
+              : "bg-zinc-900/90 border border-zinc-700 hover:bg-zinc-800"
+          }`}
+        >
+          캔버스 이동
+        </button>
+        <span className="px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700 self-center">
+          줌 {zoomPct}%
         </span>
-        <span className="px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700">
-          드래그: 영역 선택 · Shift+드래그: 화면 이동 · 휠: 줌
+        <span className="px-2 py-1 rounded bg-zinc-900/80 border border-zinc-700 self-center hidden sm:inline">
+          휠: 줌 · 모바일: 핀치
         </span>
       </div>
 
       <div
-        ref={wrapRef}
-        className="absolute inset-0 cursor-crosshair"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          setDrag(null);
-          setHover(null);
-        }}
-        onWheel={handleWheel}
-      >
-        <div
-          className="absolute"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: "0 0",
-          }}
-        >
-          <canvas ref={canvasRef} className="canvas-wrap block" />
-        </div>
-      </div>
+        ref={containerRef}
+        className="absolute inset-0"
+        style={{ cursor: mode === "pan" ? "grab" : "crosshair" }}
+      />
 
       {hover && (
-        <div className="absolute bottom-3 right-3 z-10 max-w-xs p-3 rounded-lg bg-zinc-900/95 border border-zinc-700 text-sm shadow-xl">
+        <div className="absolute bottom-3 right-3 z-10 max-w-xs p-3 rounded-lg bg-zinc-900/95 border border-zinc-700 text-sm shadow-xl pointer-events-none">
           <div className="font-semibold">{hover.owner_name ?? "익명"}</div>
           <div className="text-xs opacity-70 mt-1">
             ({hover.bx},{hover.by}) · {hover.bw}×{hover.bh} 블록
           </div>
-          {hover.has_room && (
-            <div className="text-xs mt-1 text-pink-400">클릭하면 룸이 열립니다 →</div>
+          {hover.has_panorama && (
+            <div className="text-xs mt-1 text-pink-400">
+              클릭 → 360° 룸 포털 →
+            </div>
+          )}
+          {!hover.has_panorama && hover.has_room && (
+            <div className="text-xs mt-1 text-pink-400">클릭 → 룸 열기 →</div>
           )}
         </div>
       )}

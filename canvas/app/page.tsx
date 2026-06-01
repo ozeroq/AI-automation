@@ -2,9 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Canvas from "@/components/Canvas";
+import dynamic from "next/dynamic";
 import RoomModal from "@/components/RoomModal";
 import PortalTransition, { type ScreenRect } from "@/components/PortalTransition";
+
+// OpenSeadragon이 모듈 로드 시 document에 접근하므로 SSR 비활성화
+const Canvas = dynamic(() => import("@/components/Canvas"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[80vh] rounded-xl border border-zinc-800 bg-zinc-950 flex items-center justify-center text-sm opacity-60">
+      캔버스 로딩 중...
+    </div>
+  ),
+});
 import type { BlockArea } from "@/lib/grid";
 import type { Block, BlockSummary } from "@/lib/types";
 import { TIER_PRICES_KRW, formatKrw } from "@/lib/pricing";
@@ -88,15 +98,17 @@ export default function Home() {
       )}
 
       <section className="mt-10 grid gap-4 sm:grid-cols-3 text-sm">
-        <Info title="① 빈 영역 드래그">
-          캔버스에서 사고 싶은 영역을 마우스로 드래그. 10×10 블록 단위로 자동 스냅.
+        <Info title="① 무한 줌 캔버스 탐색">
+          마우스 휠로 줌인·줌아웃. "캔버스 이동" 모드에서 드래그해 다른 영역으로
+          이동. 블록 위에 마우스를 올리면 소유자 정보가 나타납니다.
         </Info>
-        <Info title="② 360° 룸 업로드">
-          Exhibition 티어 이상은 4K 등각투영 파노라마 1장을 업로드하면, 본인 블록 클릭 시
-          화면이 풀스크린으로 확장되며 가상 룸이 열립니다.
+        <Info title="② 영역 선택 → 결제">
+          "영역 선택" 모드에서 빈 곳을 드래그하면 10×10 블록 단위로 자동 스냅됩니다.
+          한 번 구매하면 그 자리는 영구 본인 소유.
         </Info>
-        <Info title="③ 결제하면 영구 소유">
-          기본 ₩1,000/블록부터. 한 번 구매하면 본인 룸은 영원히 그 자리에 남습니다.
+        <Info title="③ 360° 룸 포털">
+          Exhibition 티어 이상은 등각투영 파노라마 1장으로 가상 룸을 엽니다. 클릭하면
+          블록이 풀스크린으로 확장되며 Pannellum 뷰어가 마운트.
         </Info>
       </section>
     </main>

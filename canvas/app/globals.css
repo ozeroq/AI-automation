@@ -17,10 +17,7 @@ html, body {
     "Apple SD Gothic Neo", Roboto, sans-serif;
 }
 
-.canvas-wrap {
-  background:
-    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100px 100px,
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 100px 100px,
-    #0f0f0f;
+/* OpenSeadragon 뷰어 내부 캔버스가 픽셀 아트 느낌을 유지하도록 */
+.openseadragon-canvas canvas {
   image-rendering: pixelated;
 }

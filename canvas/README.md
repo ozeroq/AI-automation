@@ -33,6 +33,16 @@ http://localhost:3000
 
 스토리지 키가 없으면 in-memory 모드로 동작 (재시작 시 데이터 초기화).
 
+## 핵심 기술 스택
+
+| 영역 | 라이브러리 | 역할 |
+|---|---|---|
+| 캔버스 줌·팬 | **OpenSeadragon 5** | 무한 줌 타일 피라미드 + 키네틱 패닝. 100×100 그리드를 HTML 오버레이로 그림 |
+| 360° 룸 | **Pannellum 2.5** | 등각투영 파노라마 뷰어. CDN lazy-load |
+| 포털 전환 | 자체 구현 | 블록 화면 좌표 → 풀스크린 450ms 트랜지션, Pannellum 마운트 |
+| 결제 | Stripe Checkout (KRW) | 한국 원화 결제 |
+| 영구 저장 | Upstash Redis | 무료 티어 10k req/일 |
+
 ## Vercel 배포 (무료)
 
 1. https://vercel.com 가입
