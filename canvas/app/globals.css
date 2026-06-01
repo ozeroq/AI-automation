@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0a0a;
+  --fg: #ededed;
+  --grid: #1a1a1a;
+  --accent: #ff3b81;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard",
+    "Apple SD Gothic Neo", Roboto, sans-serif;
+}
+
+.canvas-wrap {
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100px 100px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 100px 100px,
+    #0f0f0f;
+  image-rendering: pixelated;
+}

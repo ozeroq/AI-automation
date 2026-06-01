@@ -1,60 +1,70 @@
-# AI Automation — 듀얼 트랙 수익 자동화
+# PixelRoom — 100만 픽셀 디지털 전시장
 
-**현실 체크**: 이건 "버튼 누르면 돈 나오는" 시스템이 아닙니다. 콘텐츠 발행/SaaS 운영의 **반복 작업을 0으로** 만들어, 본인은 마케팅·최적화·신규 아이템 발굴에만 집중할 수 있게 해주는 인프라입니다. 보통 1~3개월 누적되어야 첫 수익이 발생합니다.
+1000×1000 캔버스에서 10×10 픽셀 블록을 사고팔며, 각 블록이 하나의 **전시 룸 / 광고 룸**이 되는 사이트.
 
-## 2개의 수익 트랙
+> Million Dollar Homepage(2005, $1M)의 진화형 — 정적 이미지가 아니라 **클릭하면 룸이 열리는** 인터랙티브 캔버스.
 
-### 1. Content Bot (`/content-bot`)
-- **무엇**: Claude API로 매일 한국어 SEO 블로그 글을 자동 생성 → GitHub Pages로 자동 발행 → 쿠팡파트너스 링크 자동 삽입
-- **수익원**: 쿠팡파트너스 어필리에이트 수수료, 추후 Google AdSense
-- **비용**: 0원 (GitHub Actions cron + GitHub Pages 호스팅 무료)
-- **운영**: 한 번 세팅 후 매일 새벽 자동 발행
+## 한 줄 컨셉
 
-### 2. AI SaaS (`/saas`)
-- **무엇**: Next.js 기반 한국어 AI 도구 (자기소개서 첨삭, 이메일 작성, 회의록 요약 등)
-- **수익원**: 무료 체험 → 월 구독 (Toss Payments / Stripe)
-- **비용**: 0원 (Vercel 무료 티어 + Claude API는 사용량 기반)
-- **운영**: 신규 도구 추가 / SEO·SNS로 트래픽 유입
+```
+캔버스 1000×1000 = 100만 픽셀 = 10,000개 블록 = 10,000개의 미니 전시장
+```
 
 ## 빠른 시작
 
 ```bash
-# 1. 환경 변수 세팅
-cp .env.example .env
-# .env에 ANTHROPIC_API_KEY, COUPANG_PARTNERS_ID 등 입력
-
-# 2. 콘텐츠 봇 로컬 테스트
-cd content-bot
-pip install -r requirements.txt
-python -m src.main --dry-run
-
-# 3. SaaS 로컬 실행
-cd saas
+cd canvas
+cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-## 배포 (모두 무료 티어)
+→ http://localhost:3000
 
-| 컴포넌트 | 호스팅 | 자동화 |
+## 프로젝트 구조
+
+```
+canvas/                 # 메인 Next.js 앱 (Vercel 배포)
+├── app/
+│   ├── page.tsx        캔버스 메인 (드래그 선택 / 클릭 → 룸)
+│   ├── buy/            구매 페이지 (티어·소개·결제)
+│   ├── room/[id]/      개별 룸 페이지 (SEO·SNS 공유용)
+│   └── api/
+│       ├── blocks/     블록 목록·상세
+│       ├── reserve/    가격 미리보기
+│       ├── checkout/   Stripe Checkout 세션
+│       └── webhook/    결제 완료 → DB 저장
+├── components/
+│   ├── Canvas.tsx      줌·팬·드래그 선택 캔버스
+│   └── RoomModal.tsx   클릭 시 열리는 룸
+├── lib/
+│   ├── grid.ts         블록 좌표 ↔ 픽셀 좌표
+│   ├── pricing.ts      티어·위치 프리미엄
+│   ├── db.ts           Upstash Redis (+ in-memory fallback)
+│   └── types.ts
+└── README.md           상세 가이드
+```
+
+## 수익 모델
+
+| 티어 | 가격/블록 | 무엇을 할 수 있는가 |
 |---|---|---|
-| 블로그 | GitHub Pages | GitHub Actions cron (매일 새벽 3시 KST) |
-| SaaS | Vercel | git push 시 자동 배포 |
-| DB (선택) | Supabase 무료 / Vercel KV | — |
+| Basic | ₩1,000 | 이미지 + 외부 링크 |
+| Gallery | ₩10,000 | 이미지 5장 + 룸 소개 |
+| Exhibition | ₩30,000 | 풀 룸 + 영상·임베드 |
+| Premium | ₩100,000 | 커스텀 HTML 룸 |
 
-## 환경 변수
+**수익 천장 시나리오** (전 블록 판매 시):
+- 전부 Basic: ₩1,000만
+- 평균 Gallery: ₩1억
+- 평균 Exhibition: ₩3억
 
-`.env.example` 참고. 최소 필요:
-- `ANTHROPIC_API_KEY` — Claude API
-- `COUPANG_PARTNERS_ID` — 쿠팡파트너스 가입 후 발급 (무료)
-- `GITHUB_TOKEN` — GitHub Actions에서 자동 주입 (수동 설정 불필요)
+## 다음 단계
 
-## 다음 단계 체크리스트
+1. **Vercel 배포** — `canvas/` 디렉토리를 import (무료)
+2. **Stripe 테스트 모드** — 키 발급 후 환경변수 입력
+3. **Upstash Redis** 무료 가입 → URL/TOKEN 환경변수 입력 (영구 저장)
+4. **첫 데모 룸 5~10개 시드** — 친구·지인 무료 입주로 캔버스가 비어보이지 않게
+5. **트래픽 유입** — X/스레드/커뮤니티에 캔버스 캡처 공유 → 입소문
 
-- [ ] `.env` 작성 (API 키 입력)
-- [ ] 쿠팡파트너스 가입 → ID 발급 → `.env`에 입력
-- [ ] GitHub Repo의 Settings → Secrets에 `ANTHROPIC_API_KEY` 추가
-- [ ] GitHub Pages 활성화 (Settings → Pages → branch: `gh-pages`)
-- [ ] 첫 발행 테스트: `gh workflow run content-cron.yml`
-- [ ] Vercel 가입 후 `saas/` 디렉토리 import → 자동 배포
-- [ ] 도메인 연결 (선택, `.dev`는 연 $12)
+자세한 운영 가이드는 `canvas/README.md` 참고.
